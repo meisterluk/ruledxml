@@ -124,7 +124,8 @@ def read_rulesfile(filepath: str) -> tuple([dict, set]):
         msg = "Expected at least one rule definition, none given in {}"
         raise exceptions.RuledXmlException(msg.format(filepath))
 
-    logging.debug(rules, required, xml_namespaces, encoding)
+    msg = '{!r} {!r} {!r} {!r}'
+    logging.debug(msg.format(rules, required, xml_namespaces, encoding))
     logging.info('%d rules, %d required elements and %d XML namespaces',
         len(rules), len(required), len(xml_namespaces))
     logging.info('encoding is set to {}'.format(encoding))
