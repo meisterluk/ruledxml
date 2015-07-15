@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+
+"""
+    ruledxml
+    --------
+
+    This command line tool implements
+    the simplest ruledxml usecase.
+
+    (C) 2015, meisterluk, BSD 3-clause license
+"""
+
+import sys
+import os.path
+import ruledxml
+import argparse
+
+
+def main(args: argparse.Namespace) -> int:
+    """Main routine"""
+    with open(args.xmlinfile, 'rb') as src_fd:
+        # create a unique/new name for the output file
+        # avoids files to be overwritten
+        outfile = args.xmloutfile
+        outdir, outfilename = os.path.split(outfile)
+        outfilename, outext = os.path.splitext(outfilename)
+        outfile = ruledxml.fs.create_unique_filepath(outdir, outfilename, outext)
+
+        with open(outfile, 'wb') as dest_fd:
+            exitcode = ruledxml.run(src_fd, args.rulesfile, dest_fd,
+                infile=args.xmlinfile, outfile=outfile)
+
+    if args.delete:
+        os.unlink(args.xmlinfile)
+
+    return exitcode
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Convert XML files according to rules.')
+    parser.add_argument('xmlinfile', help='filepath to source XML')
+    parser.add_argument('rulesfile', help='filepath to python file containing rules')
+    parser.add_argument('xmloutfile', help='filepath for target XML')
+    parser.add_argument('-d', '--delete-xmlinfile', dest='delete', action='store_true',
+                       help='delete the xmlinfile after *successful* conversion')
+
+    args = parser.parse_args()
+    sys.exit(main(args))

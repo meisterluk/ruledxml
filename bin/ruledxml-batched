@@ -1,0 +1,271 @@
+#!/usr/bin/env python3
+
+"""
+    ruledxml-batched
+    ----------------
+
+    This command line tools allows to check for files to transform.
+    If files are given, it triggers the transformation process.
+
+    This tool is meant to be called regularly to transform files
+    using ruledxml.
+
+    The exit code tells how many files failed the conversion process
+    (with a maximum value of 255).
+
+    (C) 2015, meisterluk, BSD 3-clause license
+"""
+
+import sys
+import shlex
+import os.path
+import argparse
+import subprocess
+
+# default parameters
+DEFAULT_SOURCE_DIR = './source'
+DEFAULT_RULESFILE = './rules.py'
+DEFAULT_TARGET_DIR = './target'
+WORKER_COMMAND = ['ruledxml']
+
+# global variables
+running_processes = []
+
+
+class WorkerProcess:
+    """Represents a process to apply rules to an XML file"""
+    TIMEOUT = 30
+    count = 0
+
+    def __init__(self, reporter):
+        self.reporter = reporter
+        self.command = WORKER_COMMAND
+        self.source = None
+        self.rules = None
+        self.output = None
+        self.returncode = None
+        self.pid = self.count
+        self.proc = None
+        self.exitcode = 0
+        self.dry_run = False
+        self.count += 1
+
+    @property
+    def commandline(self):
+        """The command line to start this WorkerProcess.
+
+        :return:          command line arguments
+        :rtype:           list([str])
+        """
+        if not self.source:
+            raise ValueError("Source file for worker must be set; is not")
+        if not self.rules:
+            raise ValueError("Rules file for worker must be set; is not")
+        if not self.output:
+            raise ValueError("Output file for worker must be set; is not")
+
+        return self.command + [self.source, self.rules, self.output]
+
+    def start(self):
+        """Start the WorkerProcess with `subprocess.Popen`"""
+        assert not self.proc, "Run start() only once"
+
+        if not self.dry_run:
+            self.proc = subprocess.Popen(self.commandline,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                shell=False, universal_newlines=True)
+            self.pid = self.proc.pid
+        self.reporter.process_started(self)
+
+    def stop(self):
+        """Wait for WorkerProcess to terminate"""
+        if not self.dry_run:
+            assert self.proc, "Call start() before stop()"
+
+            try:
+                self.stdout, self.stderr = self.proc.communicate(timeout=self.TIMEOUT)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+                self.stdout, self.stderr = self.proc.communicate()
+
+            self.exitcode = self.proc.returncode
+        self.reporter.process_stopped(self)
+
+
+class WorkerReporter:
+    """Reporter for running worker processes.
+    Should be the only implementation invoking print().
+    """
+
+    def _out(self, *args):
+        print(*args)
+
+    def _err(self, *args):
+        print(*args, file=sys.stderr)
+
+    def stringlist(self, lst):
+        """Print a list of strings"""
+        for l in lst:
+            self._out(" * {}".format(l))
+
+    def process_started(self, wp):
+        """Report process start.
+
+        :param wp:      The WorkerProcess to retrieve data from
+        :type wp:       WorkerProcess
+        """
+        self._out("[START] {} started for {}".format(wp.pid, wp.source))
+        self._out("        command line: {}".format(' '.join(wp.commandline)))
+
+    def process_stopped(self, wp):
+        """Report process termination.
+
+        :param wp:      The WorkerProcess to retrieve data from
+        :type wp:       WorkerProcess
+        """
+        self._out("[  END] {} stopped with exit code {}".format(wp.pid, wp.exitcode))
+
+    def summary(self, wps):
+        """Report a summary for all terminated WorkerProcess instances.
+
+        :param wps:     The terminated WorkerProcess instances
+        :type wps:      list[WorkerProcess]
+        """
+        bad = []
+        template = '{:>38s} processed by {:<10s}       exit code {}'
+
+        self._out("")
+        for i, process in enumerate(wps):
+            self._out(template.format(process.source, process.rules, process.exitcode))
+            if process.exitcode != 0:
+                bad.append(i)
+
+        if bad:
+            self._out()
+            self._out("{} failures".format(len(bad)))
+
+            msg = 'This was the stderr output of {} processed by {}:'
+            self._out()
+            self._out(msg.format(wps[bad[0]].source, wps[bad[0]].rules))
+            self._out()
+            self._out(wps[bad[0]].stderr)
+
+        return len(bad)
+
+
+def sourcefiles(input_files):
+    """Retrieve input XML filepaths.
+
+    :param input_files: input XML files to transform
+    :type input_files:  list
+    :return:            the normalized set of input files
+    :rtype:             list
+    """
+    if not input_files:
+        input_files = DEFAULT_SOURCE_DIR
+
+    input_filepaths = []
+    for path in input_files.copy():
+        if os.path.isdir(path):
+            if not os.path.exists(path):
+                msg = "Warning: no directory {} with source files found"
+                print(msg.format(path), file=sys.stderr)
+                continue
+            files = os.listdir(path)
+            input_filepaths.extend([os.path.join(path, f) for f in files])
+        else:
+            input_filepaths.append(path)
+
+    return input_filepaths
+
+
+def rules_file(rulesfile):
+    """Normalize filepath to the rules files to use.
+
+    :param rulesfile:   filepath to rules file
+    :type rulesfile:    str
+    :return:            the normalized rules file path
+    :rtype:             str
+    :raises ValueError: if filepath is invalid
+    """
+    if not rulesfile:
+        rulesfile = DEFAULT_RULESFILE
+
+    if not os.path.exists(rulesfile):
+        msg = "Rules file does not exist: {}"
+        raise ValueError(msg.format(rulesfile))
+
+
+def main(args, reporter):
+    """Main routine.
+
+    :param args:        argument namespace provided by argparse
+    :type args:         argparse.Namespace
+    :param reporter:    reporter to log actions
+    :type reporter:     WorkerReporter
+    :return:            exit code
+    :rtype:             int
+    """
+    # determine filepaths of xml files
+    input_files = sourcefiles(args.infiles)
+    if not input_files:
+        reporter.stringlist("Unfortunately no file to process", file=sys.stderr)
+        return 0
+
+    # list or process files
+    if args.list_only:
+        for filepath in input_files:
+            reporter.stringlist(filepath)
+            return 0
+
+    rulesfile = rules_file(args.rulesfile)
+    for infilepath in input_files:
+        # create unique filename
+        outdir, outfilename = os.path.split(infilepath)
+        outfile, outext = os.path.splitext(outfilename)
+        outfilepath = ruledxml.fs.create_unique_filepath(outdir, outfile, outext)
+
+        # create WorkerProcess
+        p = WorkerProcess(reporter)
+        p.source = infilepath
+        p.rules = rulesfile
+        p.output = outfilepath
+
+        if args.dry_run:
+            p.dry_run = args.dry_run
+        if args.worker:
+            p.command = shlex.split(args.worker)
+
+        p.start()
+        running_processes.append(p)
+
+    # block until finished
+    for proc in running_processes:
+        proc.stop()
+    return min(reporter.summary(running_processes), 255)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Search for files and apply conversion.')
+
+    # input, rules, output files/dirs
+    parser.add_argument('xml-input-files', metavar='infiles', nargs='*',
+                        help='input XML files to process')
+    parser.add_argument('-r', '--rulesfile', dest='rulesfile', default=DEFAULT_RULESFILE,
+                        help='rules file to use')
+    parser.add_argument('-o', '--output-directory', dest='outdir',
+                        default=DEFAULT_TARGET_DIR,
+                        help='directory for output XML files')
+
+    # informative
+    parser.add_argument('-l', '--list-files', dest='list_only', action='store_true',
+                        help='only list source files, but do not process them')
+    parser.add_argument('-y', '--dry-run', dest='dry_run', action='store_true',
+                        help='do not apply any modifications; print actions instead')
+
+    # worker-specific
+    parser.add_argument('-c', '--worker-command', dest='worker', default=WORKER_COMMAND,
+                        help='execute this command with arguments added to run the worker')
+
+    args = parser.parse_args()
+    sys.exit(main(args, WorkerReporter()))

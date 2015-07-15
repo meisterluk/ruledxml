@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <nested>
+    <child attr="3.5"/>
+  </nested>
+</root>

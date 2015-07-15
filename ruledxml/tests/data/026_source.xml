@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<html>
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body>
+    <article>
+      <lang>en_us</lang>
+      <h1>Human resources</h1>
+      <p>HR is …</p>
+      <ul>
+        <li>Recruiting</li>
+        <li>Employment</li>
+        <li>Taxes</li>
+      </ul>
+    </article>
+    <article>
+      <lang>en_au</lang>
+      <h1>Accounting</h1>
+      <p>Accouting is about …</p>
+      <ul>
+        <li>Balancing</li>
+        <li>Bills</li>
+      </ul>
+    </article>
+  </body>
+</html>

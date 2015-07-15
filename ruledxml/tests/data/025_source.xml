@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<xml>
+  <base>
+    <a>
+      <very>
+        <nested>
+          <source>
+            <element attr="val" />
+          </source>
+        </nested>
+      </very>
+    </a>
+  </base>
+  <base>
+    <a>
+      <very>
+        <nested>
+          <source>
+            <element attr="val2" />
+          </source>
+        </nested>
+      </very>
+    </a>
+  </base>
+</xml>

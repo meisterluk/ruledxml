@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='utf-8'?>
+<doc>
+  <dst>
+    <that>
+      <yrev>
+        <detsen>
+          <ecruos>
+            <tnemele rtta=" val " />
+          </ecruos>
+        </detsen>
+      </yrev>
+    </that>
+  </dst>
+  <dst>
+    <that>
+      <yrev>
+        <detsen>
+          <ecruos>
+            <tnemele rtta=" val2 " />
+          </ecruos>
+        </detsen>
+      </yrev>
+    </that>
+  </dst>
+</doc>

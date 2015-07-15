@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<xml>
+  <operation>
+    <param1>4</param1>
+    <param2>2</param2>
+    <opcode>CONCAT</opcode>
+  </operation>
+  <operation>
+    <param1>3</param1>
+    <param2>4</param2>
+    <opcode>CONCAT</opcode>
+  </operation>
+</xml>
