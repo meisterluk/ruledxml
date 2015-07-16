@@ -414,14 +414,14 @@ def read_source(dom: lxml.etree.Element, path: str) -> str:
     if path == '':
         return ''
     elif '@' in path:
-        return dom.xpath(path)
+        val = dom.xpath(path)
+        if val:
+            return val[0]
+        else:
+            return ''
     else:
         elements = dom.xpath(path)
-        if len(elements) == 0:
-            return ''
+        if elements:
+            return elements[0].text
         else:
-            elements = elements[0].xpath('text()')
-            if elements:
-                return str(elements[0])
-            else:
-                return ''
+            return ''
