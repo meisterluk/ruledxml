@@ -17,7 +17,7 @@ import itertools
 import lxml.etree
 
 
-def create_unique_filepath(folder, prefix='', suffix=''):
+def create_unique_filepath(folder, prefix='', suffix='', alphabet=string.digits):
     """Create a filepath to a file which does not exist in `folder` yet.
     The filepath starts with `prefix` and ends with `suffix`.
 
@@ -27,12 +27,14 @@ def create_unique_filepath(folder, prefix='', suffix=''):
     :type prefix:       str
     :param suffix:      suffix of the filename
     :type suffix:       str
+    :param alphabet:    the alphabet to use if additional characters are required
+    :type alphabet:     set
     :return:            the new filepath
     :rtype:             str
     """
     def candidates():
         for i in itertools.count(1):
-            for variation in itertools.product(string.ascii_lowercase, repeat=i):
+            for variation in itertools.product(alphabet, repeat=i):
                 yield ''.join(variation)
 
     candidate = os.path.join(folder, prefix + suffix)
