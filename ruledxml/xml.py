@@ -394,7 +394,7 @@ def write_destination(dom: lxml.etree.Element, path: str, value,
             element.attrib[attribute] = str(value)
         elif attribute and attr_xmlns:
             try:
-                attrname = '{%s}%s' % (xmlmap[attr_xmlns], attr)
+                attrname = '{%s}%s' % (xmlmap[attr_xmlns], attribute)
                 element.attrib[attrname] = str(value)
             except KeyError:
                 raise KeyError("Unknown namespace: {}".format(attr_xmlns))
