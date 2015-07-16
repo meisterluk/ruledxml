@@ -16,7 +16,7 @@
 """
 
 __author__ = 'Lukas Prokop <admin@lukas-prokop.at>'
-__version__ = '1.3.0'
+__version__ = '1.3.1'
 __license__ = '3-clause BSD license'
 __docformat__ = 'reStructuredText en'
 
