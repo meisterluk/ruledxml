@@ -250,6 +250,7 @@ def read_base_source(dom: lxml.etree.Element, path: str, bases: list) -> str:
         return alternatives[0]
 
     def read(element, *, attribute='', xmlns=None):
+        # TODO: namespace support
         if attribute:
             return str(element.attrib[attribute])
         else:
@@ -386,8 +387,11 @@ def write_destination(dom: lxml.etree.Element, path: str, value,
         return alternatives[0]
 
     def write(element, *, attribute='', xmlns=None):
-        if attribute:
+        if attribute and ':' not in attribute:
             element.attrib[attribute] = str(value)
+        elif attribute:
+            ns, attr = attribute.split(':')
+            element.attrib['{%s}%s' % (xmlns[ns], attr)] = str(value)
         else:
             element.text = str(value)
 
@@ -415,6 +419,7 @@ def read_source(dom: lxml.etree.Element, path: str) -> str:
     :return:        text content, attribute or ''
     :rtype:         str
     """
+    # TODO: namespace support
     if path == '':
         return ''
     elif '@' in path:
