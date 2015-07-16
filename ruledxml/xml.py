@@ -107,6 +107,8 @@ def traverse(dom, path, *,
     """
     path, *attrs = str(path).split('@')
     elements = path.lstrip('/').split('/')
+    if elements[-1] == '':
+        elements = elements[:-1]
 
     current = dom
     for i, pelement in enumerate(elements):
