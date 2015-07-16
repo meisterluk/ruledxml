@@ -177,6 +177,8 @@ def xmlns_to_lxml(element, xmlmap={}):
     try:
         uri = xmlmap[ns]
     except KeyError:
+        if ns is None:
+            ns = 'default namespace'
         msg = "Unknown XML namespace: {}".format(ns)
         raise exceptions.InvalidPathException(msg)
 
