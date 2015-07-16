@@ -86,7 +86,7 @@ def required_exists(dom: lxml.etree.Element, nonempty=None, required=None, *, fi
         suffix = " in XML file '{}'".format(filepath)
 
     for req in required:
-        if not dom.xpath(dom, req):
+        if not dom.xpath(req):
             errmsg = 'Path {} does not exist{}'.format(req, suffix)
             raise exceptions.InvalidPathException(errmsg.format(req))
 
