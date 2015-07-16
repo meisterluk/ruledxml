@@ -412,10 +412,7 @@ def read_source(dom: lxml.etree.Element, path: str) -> str:
     :rtype:         str
     """
     if path == '':
-        if dom is None:
-            return ''
-        else:
-            return str(dom.xpath('text()'))
+        return ''
     elif '@' in path:
         return dom.xpath(path)
     else:
