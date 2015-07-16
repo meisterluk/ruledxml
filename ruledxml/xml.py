@@ -136,7 +136,7 @@ def traverse(dom, path, *,
         else:
             xmlns, attr = None, attrs[0]
 
-        return dom, finish(element=current, attribute=attr, xmlns=xmlns)
+        return dom, finish(element=current, attribute=attr, attr_xmlns=xmlns)
     else:
         return dom, finish(element=current)
 
@@ -214,9 +214,12 @@ def write_base_destination(dom: lxml.etree.Element, path: str, value,
                 return alt
         return alternatives[0]
 
-    def write(element, *, attribute='', xmlns=None):
-        if attribute:
+    def write(element, *, attribute='', attr_xmlns=None):
+        if attribute and not attr_xmlns:
             element.attrib[attribute] = str(value)
+        elif attribute and attr_xmlns:
+            attrname = '{%s}%s' % (attr_xmlns, attribute)
+            element.attrib[attrname] = str(value)
         else:
             element.text = str(value)
 
@@ -249,7 +252,7 @@ def read_base_source(dom: lxml.etree.Element, path: str, bases: list) -> str:
                 return alt
         return alternatives[0]
 
-    def read(element, *, attribute='', xmlns=None):
+    def read(element, attribute='', attr_xmlns=None):
         # TODO: namespace support
         if attribute:
             return str(element.attrib[attribute])
@@ -296,7 +299,7 @@ def write_new_ambiguous_element(dom: lxml.etree.Element, path: str,
                 return alt
         return alternatives[0]
 
-    def return_element(element, *, attribute='', xmlns=None):
+    def return_element(element, attribute='', attr_xmlns=None):
         if attribute:
             msg = "Expected reference to element, but attribute {} reference given"
             raise exceptions.InvalidPathException(msg.format(attribute))
@@ -342,7 +345,7 @@ def read_ambiguous_element(dom: lxml.etree.Element, path: str, bases=None) -> li
                 return alt
         return alternatives[0]
 
-    def return_element(element, *, attribute='', xmlns=None):
+    def return_element(element, attribute='', attr_xmlns=None):
         if attribute:
             msg = "Expected reference to element, but attribute {} reference given"
             raise exceptions.InvalidPathException(msg.format(attribute))
@@ -386,12 +389,15 @@ def write_destination(dom: lxml.etree.Element, path: str, value,
     def first(alternatives):
         return alternatives[0]
 
-    def write(element, *, attribute='', xmlns=None):
-        if attribute and ':' not in attribute:
+    def write(element, *, attribute='', attr_xmlns=None):
+        if attribute and not attr_xmlns:
             element.attrib[attribute] = str(value)
-        elif attribute:
-            ns, attr = attribute.split(':')
-            element.attrib['{%s}%s' % (xmlns[ns], attr)] = str(value)
+        elif attribute and attr_xmlns:
+            try:
+                attrname = '{%s}%s' % (xmlmap[attr_xmlns], attr)
+                element.attrib[attrname] = str(value)
+            except KeyError:
+                raise KeyError("Unknown namespace: {}".format(attr_xmlns))
         else:
             element.text = str(value)
 
