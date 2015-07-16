@@ -62,25 +62,37 @@ def unique_function(filepath: str):
                 str(functions))
 
 
-def required_exists(dom: lxml.etree.Element, required: set, *, filepath=''):
-    """Validate `required` fields.
+def required_exists(dom: lxml.etree.Element, nonempty=None, required=None, *, filepath=''):
+    """Validate `required` and `nonempty` fields.
     ie. raise InvalidPathException if path does not exist in `dom`.
 
     :param dom:                   the root element of a DOM to validate
     :type dom:                    lxml.etree.Element
+    :param nonempty:              set of paths with nonempty values
+    :type nonempty:               set
     :param required:              set of required paths
-    :type required:               str
+    :type required:               set
     :param filepath:              filepath (additional info for error message)
     :type filepath:               str
-    :raises InvalidPathException: some required path does not exist
+    :raises InvalidPathException: some required path does not exist / is empty
     """
+    if not required:
+        required = set()
+    if not nonempty:
+        nonempty = set()
+
+    suffix = ""
     if filepath:
-        errmsg = "Path {{}} does not exist in XML file '{}'".format(filepath)
-    else:
-        errmsg = "Path {} does not exist"
+        suffix = " in XML file '{}'".format(filepath)
+
+    for req in nonempty:
+        if xml.read_source(dom, req) == '':
+            errmsg = 'Path {} is empty{}; must contain value'.format(req, suffix)
+            raise exceptions.InvalidPathException(errmsg.format(req))
 
     for req in required:
-        if xml.read_source(dom, req) == None:
+        if not dom.xpath(dom, req):
+            errmsg = 'Path {} does not exist{}'.format(req, suffix)
             raise exceptions.InvalidPathException(errmsg.format(req))
 
 
@@ -105,6 +117,7 @@ def read_rulesfile(filepath: str) -> tuple([dict, set]):
 
     rules = {}
     required = set()
+    nonempty = set()
     encoding = "utf-8"
     xml_namespaces = {}
 
@@ -115,6 +128,9 @@ def read_rulesfile(filepath: str) -> tuple([dict, set]):
         elif member == "required":
             required = set(getattr(rulesfile, member))
             logging.info("Found required attribute with %d elements", len(required))
+        elif member == "nonempty":
+            nonempty = set(getattr(rulesfile, member))
+            logging.info("Found nonempty attribute with %d elements", len(nonempty))
         elif member.endswith("namespaces"):
             xml_namespaces = getattr(rulesfile, member)
         elif member == "encoding":
@@ -132,6 +148,7 @@ def read_rulesfile(filepath: str) -> tuple([dict, set]):
 
     metadata = {
         'required': required,
+        'nonempty': nonempty,
         'xmlmap': xml_namespaces,
         'encoding': encoding
     }
