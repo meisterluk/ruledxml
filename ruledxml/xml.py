@@ -73,7 +73,7 @@ def traverse(dom, path, *,
     initial_element=lambda elem: lxml.etree.Element(elem),
     multiple_options=lambda opts: opts[0],
     no_options=lambda elem, current: None,
-    finish=lambda elem, attribute: None) -> tuple:
+    finish=lambda elem, attribute='', attr_xmlns='': None) -> tuple:
     """Traverse an XPath `path` in `dom`.
 
     *initial_element(name)*
@@ -86,11 +86,11 @@ def traverse(dom, path, *,
       element `name` does not exist. Return value
       contains a new element to consider as new current
       element. If None is returned instead, traversal is aborted.
-    *finish(element, attribute)*
+    *finish(element, attribute, attr_xmlns)*
       Called when traversal is about to finish at `element`.
-      If attribute is non-empty, it is the attribute name requested
-      in the original `path`. Return value is second return value of
-      `traverse` function.
+      If `attribute` is non-empty, it is the attribute name requested
+      in the original `path` and `attr_xmlns` attribute's namespace.
+      Return value is second return value of `traverse` function.
 
     :param dom:                 a root node representing a DOM
     :type dom:                  lxml.etree.Element
