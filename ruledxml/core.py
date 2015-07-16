@@ -405,7 +405,7 @@ def run_rules(src_dom: lxml.etree.Element, target_dom: lxml.etree.Element,
                 args.append(xml.read_base_source(src_dom, src, bases=src_bases))
             output = node['rule'](*args)
             if output is None:
-                continue
+                return target_dom
             return xml.write_base_destination(target_dom, node['dst'][0],
                 output, bases=dst_bases, xmlmap=xmlmap)
 
