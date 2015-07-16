@@ -473,7 +473,7 @@ def run(in_fd, rules_filepath: str, out_df, *, infile='', outfile='') -> int:
     src_dom = xml.read(in_fd)
 
     # test: required elements exist?
-    required_exists(src_dom, meta['required'], filepath=infile)
+    required_exists(src_dom, meta['nonempty'], meta['required'], filepath=infile)
 
     # apply rules
     target_dom = apply_rules(src_dom, rules, xmlmap=meta['xmlmap'])
@@ -512,7 +512,7 @@ def batch_run(in_fd, rules_filepath: str, out_filepaths: list([str]),
     count = 0
     for element in src_dom.xpath(base):
         # test: required elements exist?
-        required_exists(element, meta['required'], filepath=infile)
+        required_exists(element, meta['nonempty'], meta['required'], filepath=infile)
 
         # apply rules
         target_dom = apply_rules(element, rules, xmlmap=meta['xmlns'])
