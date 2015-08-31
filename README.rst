@@ -57,15 +57,22 @@ Required elements
 A source of errors in that design is when elements do not exist
 and an empty string is supplied as argument. This is a silent error.
 
-You can specify required elements in a variable ``required`` which
+You can specify required elements in a variable ``input_required`` which
 is interpreted before the actual processing starts::
 
-    required = [
+    input_required = [
         "/root/body/header"
     ]
 
 If the element ``/root/body/header`` does not exist in the source XML file,
 a ValueError is thrown.
+
+Non-empty elements
+------------------
+
+Similarly to required elements, we have non-empty elements. Paths mentioned
+in the ``input_nonempty`` variable are required to yield nonempty values.
+Otherwise an error is thrown and processing aborted.
 
 Implementation
 --------------
