@@ -58,8 +58,6 @@ def unique_function(filepath: str):
 
             functions[name] = lineno
             logging.info("Found {} at line {}".format(name, lineno))
-            logging.debug("function definition list extended: " +
-                str(functions))
 
 
 def required_exists(dom: lxml.etree.Element, nonempty=None, required=None, *, filepath=''):
@@ -116,42 +114,42 @@ def read_rulesfile(filepath: str) -> tuple([dict, set]):
     rulesfile = loader.load_module()
 
     rules = {}
-    required = set()
-    nonempty = set()
-    encoding = "utf-8"
-    xml_namespaces = {}
+    metadata = {
+        'input_required': set(),
+        'input_nonempty': set(),
+        'input_xml_namespaces': {},
+        'output_encoding': 'utf-8',
+        'output_xml_namespaces': {}
+    }
+    tmpl = "Found %s attribute with %d elements"
 
     for member in dir(rulesfile):
         if member.startswith("rule"):
             rules[member] = getattr(rulesfile, member)
             logging.info("Found %s", member)
-        elif member == "required":
-            required = set(getattr(rulesfile, member))
-            logging.info("Found required attribute with %d elements", len(required))
-        elif member == "nonempty":
-            nonempty = set(getattr(rulesfile, member))
-            logging.info("Found nonempty attribute with %d elements", len(nonempty))
-        elif member.endswith("namespaces"):
-            xml_namespaces = getattr(rulesfile, member)
-        elif member == "encoding":
-            encoding = getattr(rulesfile, member)
+        elif member == "input_required":
+            metadata['input_required'] = set(getattr(rulesfile, member))
+            logging.info(tmpl, "input_required", len(metadata['input_required']))
+        elif member == "input_nonempty":
+            metadata['input_nonempty'] = set(getattr(rulesfile, member))
+            logging.info(tmpl, "input_nonempty", len(metadata['input_nonempty']))
+        elif member == "input_namespaces":
+            metadata['input_xml_namespaces'] = getattr(rulesfile, member)
+            logging.info(tmpl, "input_namespaces", len(metadata['input_xml_namespaces']))
+        elif member == "output_namespaces":
+            metadata['output_xml_namespaces'] = getattr(rulesfile, member)
+            logging.info(tmpl, 'output_namespaces', len(metadata['output_xml_namespaces']))
+        elif member == "output_encoding":
+            metadata['output_encoding'] = getattr(rulesfile, member)
+            logging.info('Attribute %s found. Is set to %s', 'output_encoding',
+                metadata['output_encoding'])
 
     if not rules:
         msg = "Expected at least one rule definition, none given in {}"
         raise exceptions.RuledXmlException(msg.format(filepath))
 
-    msg = '{!r} {!r} {!r} {!r}'
-    logging.debug(msg.format(rules, required, xml_namespaces, encoding))
-    logging.info('%d rules, %d required elements and %d XML namespaces',
-        len(rules), len(required), len(xml_namespaces))
-    logging.info('encoding is set to {}'.format(encoding))
+    logging.debug('metadata found: %s', str(metadata))
 
-    metadata = {
-        'required': required,
-        'nonempty': nonempty,
-        'xmlmap': xml_namespaces,
-        'encoding': encoding
-    }
     return rules, metadata
 
 
@@ -473,13 +471,13 @@ def run(in_fd, rules_filepath: str, out_df, *, infile='', outfile='') -> int:
     src_dom = xml.read(in_fd)
 
     # test: required elements exist?
-    required_exists(src_dom, meta['nonempty'], meta['required'], filepath=infile)
+    required_exists(src_dom, meta['input_nonempty'], meta['input_required'], filepath=infile)
 
     # apply rules
-    target_dom = apply_rules(src_dom, rules, xmlmap=meta['xmlmap'])
+    target_dom = apply_rules(src_dom, rules, xmlmap=meta['output_xml_namespaces'])
 
     # write target XML to file
-    xml.write(target_dom, out_df, encoding=meta['encoding'])
+    xml.write(target_dom, out_df, encoding=meta['output_encoding'])
 
     return 0
 
@@ -512,15 +510,17 @@ def batch_run(in_fd, rules_filepath: str, out_filepaths: list([str]),
     count = 0
     for element in src_dom.xpath(base):
         # test: required elements exist?
-        required_exists(element, meta['nonempty'], meta['required'], filepath=infile)
+        required_exists(element, meta['input_nonempty'],
+            meta['input_required'], filepath=infile)
 
         # apply rules
-        target_dom = apply_rules(element, rules, xmlmap=meta['xmlns'])
+        target_dom = apply_rules(element, rules,
+            xmlmap=meta['output_xml_namespaces'])
 
         # write target XML to file
         fs.create_base_directories(out_filepaths[count])
         with open(out_filepaths[count], 'wb') as out_fd:
-            xml.write(target_dom, out_fd, encoding=meta['encoding'])
+            xml.write(target_dom, out_fd, encoding=meta['output_encoding'])
 
         count += 1
 
