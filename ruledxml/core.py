@@ -127,12 +127,10 @@ def read_rulesfile(filepath: str) -> tuple([dict, set]):
         if member.startswith("rule"):
             rules[member] = getattr(rulesfile, member)
             logging.info("Found %s", member)
-        elif member == "input_required":
-            metadata['input_required'] = set(getattr(rulesfile, member))
-            logging.info(tmpl, "input_required", len(metadata['input_required']))
-        elif member == "input_nonempty":
-            metadata['input_nonempty'] = set(getattr(rulesfile, member))
-            logging.info(tmpl, "input_nonempty", len(metadata['input_nonempty']))
+        elif member in {"input_required", "input_nonempty",
+                        "output_required", "output_nonempty"}:
+            metadata[member] = set(getattr(rulesfile, member))
+            logging.info(tmpl, member, len(metadata[metadata]))
         elif member == "input_namespaces":
             metadata['input_xml_namespaces'] = getattr(rulesfile, member)
             logging.info(tmpl, "input_namespaces", len(metadata['input_xml_namespaces']))
@@ -516,6 +514,9 @@ def batch_run(in_fd, rules_filepath: str, out_filepaths: list([str]),
         # apply rules
         target_dom = apply_rules(element, rules,
             xmlmap=meta['output_xml_namespaces'])
+
+        # test: required elements exist?
+        required_exists(target_dom, meta['output_nonempty'], meta['output_required'])
 
         # write target XML to file
         fs.create_base_directories(out_filepaths[count])
