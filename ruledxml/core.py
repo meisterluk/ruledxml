@@ -130,7 +130,7 @@ def read_rulesfile(filepath: str) -> tuple([dict, set]):
         elif member in {"input_required", "input_nonempty",
                         "output_required", "output_nonempty"}:
             metadata[member] = set(getattr(rulesfile, member))
-            logging.info(tmpl, member, len(metadata[metadata]))
+            logging.info(tmpl, member, len(metadata[member]))
         elif member == "input_namespaces":
             metadata['input_xml_namespaces'] = getattr(rulesfile, member)
             logging.info(tmpl, "input_namespaces", len(metadata['input_xml_namespaces']))
