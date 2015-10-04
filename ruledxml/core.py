@@ -445,7 +445,7 @@ def apply_rules(dom: lxml.etree.Element, rules: dict, *, xmlmap=None):
     return run_rules(dom, None, classified, xmlmap)
 
 
-def run(in_fd, rules_filepath: str, out_df, *, infile='', outfile='') -> int:
+def run(in_fd, rules_filepath: str, out_fd, *, infile='', outfile='') -> int:
     """Process one file.
 
     :param in_fd:           File descriptor to one input XML file
@@ -475,7 +475,7 @@ def run(in_fd, rules_filepath: str, out_df, *, infile='', outfile='') -> int:
     target_dom = apply_rules(src_dom, rules, xmlmap=meta['output_xml_namespaces'])
 
     # write target XML to file
-    xml.write(target_dom, out_df, encoding=meta['output_encoding'])
+    xml.write(target_dom, out_fd, encoding=meta['output_encoding'])
 
     return 0
 
