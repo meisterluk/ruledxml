@@ -286,7 +286,7 @@ def classify_rules(rules: dict):
     :rtype:             [dict(), dict(), ...]
     """
     classified = []
-    orders = set(range(len(rules)))
+    max_user_dorder = None
 
     # add basic rules
     each_found = False
@@ -295,10 +295,11 @@ def classify_rules(rules: dict):
             each_found = True
             continue
 
-        user_order = rule.metadata.get('order')
-        if user_order is not None:
-            user_order = int(user_order)
-            orders.remove(user_order)
+        user_dorder = rule.metadata.get('dst').get('order')
+        if user_dorder is not None:
+            user_dorder = int(user_dorder)
+        if max_user_dorder is None or user_dorder > max_user_dorder:
+            max_user_dorder = user_dorder
 
         classified.append({
             'name': rulename,
@@ -307,15 +308,14 @@ def classify_rules(rules: dict):
             'each': [],
             'src': rule.metadata.get('src', []),
             'dst': rule.metadata.get('dst', {}).get('dests', []),
-            'dorder': (rule.metadata.get('dst', {}).get('order'),)
+            'dorder': user_dorder
         })
 
-    # assign orders not defined by user
+    # assign destination orders not defined by user
     for ruledata in classified:
         if ruledata['dorder'] is None:
-            order = min(orders)
-            orders.remove(order)
-            ruledata['dorder'] = order
+            max_user_dorder
+            ruledata['dorder'] = max_user_dorder
 
     if not each_found:
         return classified
@@ -361,18 +361,27 @@ def classify_rules(rules: dict):
             'name': rulename,
             'src': rule.metadata.get('src', []),
             'dst': rule.metadata.get('dst', {}).get('dests', []),
-            'dorder': (rule.metadata.get('dst', {}).get('order'),),
+            'dorder': rule.metadata.get('dst', {}).get('order'),
             'rule': rule
         })
 
     for struct in recursive_structure:
-        order = min(orders)
-        orders.remove(order)
-        struct['order'] = order
-
         classified.append(struct)
 
     return classified
+
+
+def reorder_rules(rules: dict):
+    """Take `rules` and reorder rules such that rule
+    with low orders are executed first.
+
+    :param rules:       a recursive structure representing rules to be executed
+    :type rules:        dict(str: function)
+    :return:            a list of dictionaries containing rules with metadata;
+                        might be recursive (dicts contain lists of dicts)
+    :rtype:             [dict(), dict(), ...]
+    """
+    return rules
 
 
 def run_rules(src_dom: lxml.etree.Element, target_dom: lxml.etree.Element,
@@ -449,7 +458,8 @@ def apply_rules(dom: lxml.etree.Element, rules: dict, *, xmlmap=None):
     """
     validate_rules(rules)
     classified = classify_rules(rules)
-    return run_rules(dom, None, classified, xmlmap)
+    ordered = reorder_rules(classified)
+    return run_rules(dom, None, ordered, xmlmap)
 
 
 def run(in_fd, rules_filepath: str, out_fd, *, infile='', outfile='') -> int:
