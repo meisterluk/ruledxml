@@ -2,21 +2,21 @@
 <doc>
   <section language="en_us" charset="utf-8">
     <text>
+      <paragraph style="text-indent:5px">Human resources: HR is …</paragraph>
       <list>
         <item>Recruiting</item>
         <item>Employment</item>
         <item>Taxes</item>
       </list>
-      <paragraph style="text-indent:5px">Human resources: HR is …</paragraph>
     </text>
   </section>
   <section language="en_au" charset="utf-8">
     <text>
+      <paragraph style="text-indent:5px">Accounting: Accouting is about …</paragraph>
       <list>
         <item>Balancing</item>
         <item>Bills</item>
       </list>
-      <paragraph style="text-indent:5px">Accounting: Accouting is about …</paragraph>
     </text>
   </section>
 </doc>

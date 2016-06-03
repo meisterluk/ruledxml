@@ -19,3 +19,9 @@ def ruleThree(text):
 @destination("/output/one", order=1)
 def ruleFour(text):
     return text
+
+# missing order must not trigger exception
+@source("/input/undefined")
+@destination("/output/null")
+def ruleNull(text):
+    return None

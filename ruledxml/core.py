@@ -295,10 +295,10 @@ def classify_rules(rules: dict):
             each_found = True
             continue
 
-        user_dorder = rule.metadata.get('dst').get('order')
+        user_dorder = rule.metadata.get('dst', {}).get('order')
         if user_dorder is not None:
             user_dorder = int(user_dorder)
-        if max_user_dorder is None or user_dorder > max_user_dorder:
+        if max_user_dorder is None or (user_dorder is not None and user_dorder > max_user_dorder):
             max_user_dorder = user_dorder
 
         classified.append({
@@ -311,10 +311,13 @@ def classify_rules(rules: dict):
             'dorder': user_dorder
         })
 
+    if max_user_dorder is None:
+        max_user_dorder = 0
+
     # assign destination orders not defined by user
     for ruledata in classified:
         if ruledata['dorder'] is None:
-            max_user_dorder
+            max_user_dorder += 1
             ruledata['dorder'] = max_user_dorder
 
     if not each_found:
@@ -326,10 +329,16 @@ def classify_rules(rules: dict):
         if 'each' not in rule.metadata:
             continue
 
+        dorder = rule.metadata.get('dst', {}).get('dorder')
+        if dorder is None:
+            max_user_dorder += 1
+            dorder = max_user_dorder
+
         foreach_rules.append({
             'foreach': rule.metadata.get('each', []),
             'source': rule.metadata.get('src', []),
-            'destination': rule.metadata.get('dst', {}).get('dests', [])
+            'destination': rule.metadata.get('dst', {}).get('dests', []),
+            'dorder': dorder
         })
 
     # build recursive structure for @foreach entries
@@ -354,6 +363,11 @@ def classify_rules(rules: dict):
         if 'each' not in rule.metadata:
             continue
 
+        dorder = rule.metadata.get('dst', {}).get('dorder')
+        if dorder is None:
+            max_user_dorder += 1
+            dorder = max_user_dorder
+
         most_nested = rule.metadata['each'][-1]
         lst = traverse(recursive_structure, most_nested[0])
         lst.append({
@@ -361,7 +375,7 @@ def classify_rules(rules: dict):
             'name': rulename,
             'src': rule.metadata.get('src', []),
             'dst': rule.metadata.get('dst', {}).get('dests', []),
-            'dorder': rule.metadata.get('dst', {}).get('order'),
+            'dorder': dorder,
             'rule': rule
         })
 
@@ -381,6 +395,13 @@ def reorder_rules(rules: dict):
                         might be recursive (dicts contain lists of dicts)
     :rtype:             [dict(), dict(), ...]
     """
+    def sorting_traverse(node):
+        node.sort(key=lambda v: v.get('dorder', float('inf')))
+        for d in node:
+            if 'children' in d:
+                sorting_traverse(d['children'])
+
+    sorting_traverse(rules)
     return rules
 
 
