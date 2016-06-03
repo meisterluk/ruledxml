@@ -20,7 +20,7 @@ def annotate_function(key, init, clbk):
     :type key:          str | int
     :param init:        initial value
     :param clbk:        A callback taking one argument and returning new value for key
-    :type:              function
+    :rtype:             function
     """
     def outer(func):
         if hasattr(func, 'metadata'):
