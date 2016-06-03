@@ -44,9 +44,10 @@ def source(*vals):
     return annotate_function("src", list(vals), lambda v: v.extend(vals) or v)
 
 
-def destination(*vals):
+def destination(*vals, order=None):
     """Decorator: Declare the destination values that data will be written to"""
-    return annotate_function("dst", list(vals), lambda v: v.extend(vals) or v)
+    data = {'dests': vals, 'order': order}
+    return annotate_function("dst", data, lambda v: v['dests'].extend(vals) or v)
 
 
 def foreach(*vals):

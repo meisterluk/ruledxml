@@ -4,8 +4,9 @@ import unittest
 from . import test_destination
 from . import test_source
 from . import test_foreach
+from . import test_order
 
-TEST_MODULES = [test_destination, test_source, test_foreach]
+TEST_MODULES = [test_destination, test_source, test_foreach, test_order]
 
 
 def runall():

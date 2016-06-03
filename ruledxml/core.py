@@ -161,12 +161,13 @@ def validate_rules(rules: dict):
     for rulename, rule in rules.items():
         # a rule must have @source, @destination or @foreach applied
         if not hasattr(rule, 'metadata'):
-            msg = ("Function {} is considered to be a rule, but this "
+            msg = ("Function {} is considered to be a rule, but it "
                    "requires at least a @destination declaration")
             raise exceptions.InvalidRuleDestination(msg.format(rulename))
 
         # a rule must have at least one @destination
-        dst_len = len(rule.metadata.get('dst', []))
+        dst = rule.metadata.get('dst', {})
+        dst_len = len(dst.get('dests', []))
         if dst_len != 1:
             msg = "A rule must have exactly 1 @destination. {} has {}"
             raise exceptions.TooManyRuleDestinations(msg.format(rulename, dst_len))
@@ -183,14 +184,14 @@ def validate_rules(rules: dict):
                 msg = "@foreach must have exactly two arguments. {} has {}"
                 raise exceptions.InvalidRuleForeach(msg.format(rulename, each_arg_len))
 
-            each_dst_len = len(rule.metadata.get('dst', []))
+            each_dst_len = len(rule.metadata.get('dst', {}).get('dsts', []))
             if each_dst_len > 1:
                 msg = ("@foreach rules must have at most "
                        "1 @destination. {} has {}")
                 raise exceptions.InvalidRuleForeach(msg.format(rulename, each_dst_len))
 
             # outer @foreach[0] must be prefix of innner @foreach[0]
-            destination = rule.metadata['dst'][0]
+            destination = rule.metadata['dst']['dests'][0]
             for source in rule.metadata.get('src', []):
                 prev_base_src = None
                 for base_src, base_dst in rule.metadata['each']:
@@ -284,10 +285,6 @@ def classify_rules(rules: dict):
                         might be recursive (dicts contain lists of dicts)
     :rtype:             [dict(), dict(), ...]
     """
-    # I store an 'order' attribute.
-    # It is not used for processed, only for documentation.
-    # Lists are ordered anyway and elements are added in the correct order.
-
     classified = []
     orders = set(range(len(rules)))
 
@@ -298,8 +295,10 @@ def classify_rules(rules: dict):
             each_found = True
             continue
 
-        order = min(orders)
-        orders.remove(order)
+        user_order = rule.metadata.get('order')
+        if user_order is not None:
+            user_order = int(user_order)
+            orders.remove(user_order)
 
         classified.append({
             'name': rulename,
@@ -307,9 +306,16 @@ def classify_rules(rules: dict):
             'rule': rule,
             'each': [],
             'src': rule.metadata.get('src', []),
-            'dst': rule.metadata.get('dst', []),
-            'order': (order,)
+            'dst': rule.metadata.get('dst', {}).get('dests', []),
+            'dorder': (rule.metadata.get('dst', {}).get('order'),)
         })
+
+    # assign orders not defined by user
+    for ruledata in classified:
+        if ruledata['dorder'] is None:
+            order = min(orders)
+            orders.remove(order)
+            ruledata['dorder'] = order
 
     if not each_found:
         return classified
@@ -323,7 +329,7 @@ def classify_rules(rules: dict):
         foreach_rules.append({
             'foreach': rule.metadata.get('each', []),
             'source': rule.metadata.get('src', []),
-            'destination': rule.metadata.get('dst', [])
+            'destination': rule.metadata.get('dst', {}).get('dests', [])
         })
 
     # build recursive structure for @foreach entries
@@ -347,14 +353,15 @@ def classify_rules(rules: dict):
     for rulename, rule in rules.items():
         if 'each' not in rule.metadata:
             continue
-        
+
         most_nested = rule.metadata['each'][-1]
         lst = traverse(recursive_structure, most_nested[0])
         lst.append({
             'class': 'foreach-rule',
             'name': rulename,
             'src': rule.metadata.get('src', []),
-            'dst': rule.metadata.get('dst', []),
+            'dst': rule.metadata.get('dst', {}).get('dests', []),
+            'dorder': (rule.metadata.get('dst', {}).get('order'),),
             'rule': rule
         })
 
