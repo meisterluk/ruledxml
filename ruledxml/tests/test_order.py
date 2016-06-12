@@ -8,7 +8,7 @@ import ruledxml
 from . import utils
 
 
-class TestRuledXmlForeach(unittest.TestCase):
+class TestRuledXmlOrder(unittest.TestCase):
     def test_030(self):
         result = io.BytesIO()
         with open(utils.data('030_source.xml')) as src:
