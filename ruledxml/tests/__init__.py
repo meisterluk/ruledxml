@@ -5,8 +5,9 @@ from . import test_destination
 from . import test_source
 from . import test_foreach
 from . import test_order
+from . import test_namespaces
 
-TEST_MODULES = [test_destination, test_source, test_foreach, test_order]
+TEST_MODULES = [test_destination, test_source, test_foreach, test_order, test_namespaces]
 
 
 def runall():
