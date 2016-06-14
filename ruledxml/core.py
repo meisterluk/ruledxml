@@ -499,17 +499,12 @@ def normalize_path(xmlpath: str, xmlns=[]) -> str:
 
     assert 0 <= xmlpath.count('@') <= 1, "only one @ symbol allowed in paths"
     base, base_attr = norm(xmlpath)
-    print('\n\n\n\n')
-    print('Given the following XML namespaces: {}'.format(xmlns))
-    print('Search for XML namespaces used in the following path: {}'.format(xmlpath))
     xmlmap = {}
     for path, name, uri in xmlns:
         ref, attr = norm(path)
-        print('  Compare base={} with ref={}'.format(base, ref))
         if base[0:len(ref)] == ref:
             xmlmap[name] = uri
 
-    print("Results in xmlmap {}".format(xmlmap))
     normalized_path = ''
     for ns, element in base:
         normalized_path += '/'

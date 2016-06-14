@@ -3,15 +3,15 @@
 from ruledxml import source, destination
 
 input_xml_namespaces = [
-    ("/doc", "doc", "http://example.org/")
+    ("/doc:doc", "doc", "http://example.org/")
 ]
 
 output_xml_namespaces = [
-    ("/html", "xhtml", "http://www.w3.org/1999/xhtml")
+    ("/xhtml:html", "xhtml", "http://www.w3.org/1999/xhtml")
 ]
 
 
-@destination("/xhtml:html/xml:lang")
+@destination("/xhtml:html/@xml:lang")
 def ruleLanguage():
     return "de"
 
