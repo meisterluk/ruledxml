@@ -47,6 +47,68 @@ def write(dom: lxml.etree.Element, fd, encoding='utf-8', **lxml_options):
     fd.write(lxml.etree.tostring(dom, **opts))
 
 
+def make_xpath(element, query, nsmap):
+    """Perform an XPath query on `element`. Maps `nsmap` back into the query.
+    Instead of::
+
+    >>> element.xpath('/{http://example.org}root',
+    ...               namespaces={'ns': 'http://example.org'})
+
+    you need to call
+
+    >>> element.xpath('/ns:root', namespaces={'ns': 'http://example.org'})
+
+    This helper function resolves this namespacing.
+
+    :param element:     element of an XML DOM
+    :type element:      lxml.etree.Element
+    :param query:       an XPath expression
+    :type query:        str
+    :param nsmap:       a map of XML namespaces
+    :type nsmap:        dict
+    :return:            the xpath call return value
+    """
+    if '{' not in query:
+        wo_default = dict((k, v) for k,v in nsmap.items() if k is not None)
+        return element.xpath(query, namespaces=wo_default)
+
+    for name, uri in nsmap.items():
+        if name is None:
+            query = query.replace('{' + uri + '}', '')
+        else:
+            query = query.replace('{' + uri + '}', name + ':')
+
+    return element.xpath(query, namespaces=nsmap)
+
+
+def split_xmlpath(xmlpath: str) -> list:
+    """Given an XML-like path. Return its split components.
+
+    >>> split_xmlpath('/a/b')
+    ['a', 'b']
+    >>> split_xmlpath('/{http://example.org}a/b')
+    ['{http://example.org}a', 'b']
+
+    :param xmlpath:     An XML path like string to parse
+    :type xmlpath:      str
+    :return:            components of the given path
+    :rtype:             list
+    """
+    in_brackets = False
+    indices = []
+    for i, char in enumerate(xmlpath):
+        if not in_brackets and char == '{':
+            in_brackets = True
+        elif in_brackets and char == '}':
+            in_brackets = False
+        elif not in_brackets and char == '/':
+            indices.append(i)
+
+    a = [0] + indices[:]
+    b = indices[:] + [len(xmlpath)]
+    return [xmlpath[src + 1:dst] for src, dst in zip(a, b) if src < dst]
+
+
 def strip_last_element(path):
     """Strip the last element off an XPath-like `path`.
     Raises InvalidPathException, if path refers to an attribute.
@@ -113,7 +175,7 @@ def traverse(dom, path, *,
     :rtype:                  tuple([lxml.etree.Element, *])
     """
     base, *attrs = str(path).split('@')
-    elements = base.strip('/').split('/')
+    elements = split_xmlpath(base)
 
     if xmlmap is None:
         xmlmap = {}
@@ -129,7 +191,7 @@ def traverse(dom, path, *,
             continue
 
         # check options
-        options = current.xpath(pelement)
+        options = make_xpath(current, pelement, xmlmap)
 
         # case distinction for number of options
         if len(options) == 0 or options is None:
@@ -195,12 +257,11 @@ def write_base_destination(dom: lxml.etree.Element, path: str, value,
         current.append(new_element)
         return new_element
 
-    def write(element, *, attribute='', attr_xmlns=None):
-        if attribute and not attr_xmlns:
+    def write(element, attribute='', attr_xmlns={}):
+        if attribute:
+            if attr_xmlns:
+                element.nsmap.update(attr_xmlns)
             element.attrib[attribute] = str(value)
-        elif attribute and attr_xmlns:
-            attrname = '{%s}%s' % (attr_xmlns, attribute)
-            element.attrib[attrname] = str(value)
         else:
             element.text = str(value)
 
@@ -246,7 +307,7 @@ def read_base_source(dom: lxml.etree.Element, path: str,
 
 
 def write_new_ambiguous_element(dom: lxml.etree.Element, path: str,
-    bases=None, xmlmap=None) -> lxml.etree.Element:
+    bases=None, xmlmap={}) -> lxml.etree.Element:
     """Given a `path`, traverse it in `path`, use `bases` on ambiguous elements
     and create a new element for the top-level element of `path`.
 
@@ -283,14 +344,14 @@ def write_new_ambiguous_element(dom: lxml.etree.Element, path: str,
             raise exceptions.InvalidPathException(msg.format(attribute))
         return element
 
-    def create_element(name, current):
+    def create_element(name, current, xmlmap):
         new_element = lxml.etree.Element(name, nsmap=xmlmap)
         current.append(new_element)
         return new_element
 
     last_element = traverse(dom, path, multiple_options=base_or_first,
         no_options=create_element, finish=return_element)[1]
-    new_element = create_element(last, last_element)
+    new_element = create_element(last, last_element, xmlmap)
 
     return new_element
 
@@ -318,7 +379,7 @@ def read_ambiguous_element(dom: lxml.etree.Element,
     if bases is None:
         bases = []
     if not last:
-        return dom.xpath(last)
+        return make_xpath(dom, last, xmlmap)
 
     def base_or_first(alternatives):
         for alt in alternatives:
@@ -340,7 +401,7 @@ def read_ambiguous_element(dom: lxml.etree.Element,
     if last_element is None:
         return []
 
-    return last_element.xpath(last) or []
+    return make_xpath(last_element, last, xmlmap) or []
 
 
 def write_destination(dom: lxml.etree.Element, path: str, value,
@@ -368,19 +429,15 @@ def write_destination(dom: lxml.etree.Element, path: str, value,
     def first(alternatives):
         return alternatives[0]
 
-    def write(element, attribute='', attr_xmlns=None):
-        if attribute and not attr_xmlns:
+    def write(element, attribute='', attr_xmlns={}):
+        if attribute:
+            if attr_xmlns:
+                element.nsmap.update(attr_xmlns)
             element.attrib[attribute] = str(value)
-        elif attribute and attr_xmlns:
-            try:
-                attrname = '{%s}%s' % (xmlmap[attr_xmlns], attribute)
-                element.attrib[attrname] = str(value)
-            except KeyError:
-                raise KeyError("Unknown namespace: {}".format(attr_xmlns))
         else:
             element.text = str(value)
 
-    def cont(name, current):
+    def cont(name, current, xmlmap):
         new_element = lxml.etree.Element(name, nsmap=xmlmap)
         current.append(new_element)
         return new_element
@@ -410,13 +467,13 @@ def read_source(dom: lxml.etree.Element, path: str, xmlmap={}) -> str:
     if path == '':
         return ''
     elif '@' in path:
-        val = dom.xpath(path, namespaces=xmlmap)
+        val = make_xpath(dom, path, xmlmap)
         if val:
             return val[0] or ''
         else:
             return ''
     else:
-        elements = dom.xpath(path, namespaces=xmlmap)
+        elements = make_xpath(dom, path, xmlmap)
         if elements:
             return elements[0].text or ''
         else:

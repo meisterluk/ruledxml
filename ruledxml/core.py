@@ -132,12 +132,12 @@ def read_rulesfile(filepath: str) -> tuple([dict, set]):
                         "output_required", "output_nonempty"}:
             metadata[member] = set(getattr(rulesfile, member))
             logging.info(tmpl, member, len(metadata[member]))
-        elif member == "input_namespaces":
+        elif member == "input_xml_namespaces":
             metadata['input_xml_namespaces'] = getattr(rulesfile, member)
-            logging.info(tmpl, "input_namespaces", len(metadata['input_xml_namespaces']))
-        elif member == "output_namespaces":
+            logging.info(tmpl, "input_xml_namespaces", len(metadata['input_xml_namespaces']))
+        elif member == "output_xml_namespaces":
             metadata['output_xml_namespaces'] = getattr(rulesfile, member)
-            logging.info(tmpl, 'output_namespaces', len(metadata['output_xml_namespaces']))
+            logging.info(tmpl, 'output_xml_namespaces', len(metadata['output_xml_namespaces']))
         elif member == "output_encoding":
             metadata['output_encoding'] = getattr(rulesfile, member)
             logging.info('Attribute %s found. Is set to %s', 'output_encoding',
@@ -158,7 +158,7 @@ def read_rulesfile(filepath: str) -> tuple([dict, set]):
         # is a dict: version 1 definition, convert now
         input_xmlns = metadata['input_xml_namespaces']
         metadata['input_xml_namespaces'] = []
-        for nsname, uri in metadata['input_xml_namespaces']:
+        for nsname, uri in input_xmlns:
             metadata['input_xml_namespaces'].append(('/', nsname, uri))
 
     # compatibility of output_xml_namespaces
@@ -169,7 +169,7 @@ def read_rulesfile(filepath: str) -> tuple([dict, set]):
     else:
         output_xmlns = metadata['output_xml_namespaces']
         metadata['output_xml_namespaces'] = []
-        for nsname, uri in metadata['output_xml_namespaces']:
+        for nsname, uri in output_xmlns:
             metadata['output_xml_namespaces'].append(('/', nsname, uri))
 
     # the following namespaces are predefined
@@ -187,8 +187,8 @@ def read_rulesfile(filepath: str) -> tuple([dict, set]):
             if name == 'xmlns':
                 logging.error("xml namespace 'xmlns' is illegal, will be removed")
 
-        metadata[key] = map(lambda p, n, l: (p, n, XML_NS if n == 'xml' else l), metadata[key])
-        metadata[key] = list(filter(lambda p, n, l: n != 'xmlns', metadata[key]))
+        metadata[key] = map(lambda e: (e[0], e[1], XML_NS if e[1] == 'xml' else e[2]), metadata[key])
+        metadata[key] = list(filter(lambda e: e[1] != 'xmlns', metadata[key]))
 
         if not xml_found:
             metadata[key].append(('/', 'xml', XML_NS))
@@ -470,15 +470,16 @@ def normalize_path(xmlpath: str, xmlns=[]) -> str:
     """
     def norm(p):
         base, *attrs = p.split('@')
-        elements = list(filter(bool, base[0].strip('/').split('/')))
+        elements = list(filter(bool, base.strip('/').split('/')))
 
         # prepare attribute
         if attrs:
-            attr = attrs[0].split(':')
-            if not attr[0]:
-                attr[0] = None
-            assert len(attr) == 2, "Only one namespace allowed in attributes"
-            attr = tuple(attr)
+            attre = attrs[0].split(':')
+            assert len(attre) <= 2, "Only one namespace allowed in attributes"
+            if len(attre) == 1:
+                attr = (None, attre[0])
+            else:
+                attr = (attre[0], attre[1])
         else:
             attr = None
 
@@ -490,7 +491,7 @@ def normalize_path(xmlpath: str, xmlns=[]) -> str:
         rep = []
         for elem in elements:
             if ':' in elem and elem[0] != ':':
-                rep.append(elem.split(':'))
+                rep.append(tuple(elem.split(':')))
             else:
                 rep.append((None, elem))
 
@@ -498,12 +499,17 @@ def normalize_path(xmlpath: str, xmlns=[]) -> str:
 
     assert 0 <= xmlpath.count('@') <= 1, "only one @ symbol allowed in paths"
     base, base_attr = norm(xmlpath)
+    print('\n\n\n\n')
+    print('Given the following XML namespaces: {}'.format(xmlns))
+    print('Search for XML namespaces used in the following path: {}'.format(xmlpath))
     xmlmap = {}
-    for path, name, uri in base:
+    for path, name, uri in xmlns:
         ref, attr = norm(path)
-        if ref[0:len(base)] == base:
+        print('  Compare base={} with ref={}'.format(base, ref))
+        if base[0:len(ref)] == ref:
             xmlmap[name] = uri
 
+    print("Results in xmlmap {}".format(xmlmap))
     normalized_path = ''
     for ns, element in base:
         normalized_path += '/'
@@ -530,29 +536,30 @@ def normalize_path(xmlpath: str, xmlns=[]) -> str:
 
 
 def run_rules(src_dom: lxml.etree.Element, target_dom: lxml.etree.Element,
-    classified: list, xmlns=None):
+    classified: list, input_xmlns=None, output_xmlns=None):
     """Actually apply the classified rules to a target DOM.
 
-    :param src_dom:     the root element of a DOM to retrieve source data from
-    :type src_dom:      lxml.etree.Element
-    :param target_dom:  the root element of a DOM to write destination data to
-    :type target_dom:   lxml.etree.Element
-    :param classified:  a list of dictionaries containing rules with metadata;
-                        might be recursive (dicts contain lists of dicts)
-    :type classified:   [dict(), dict(), ...]
-    :param xmlns:       XML namespaces to create if used in a path
-    :type xmlns:        list
-    :param bases:       Base elements (created for source @foreach elements)
-    :type bases:        list
-    :return:            the root element of a new DOM
-    :rtype:             lxml.etree.Element
+    :param src_dom:      the root element of a DOM to retrieve source data from
+    :type src_dom:       lxml.etree.Element
+    :param target_dom:   the root element of a DOM to write destination data to
+    :type target_dom:    lxml.etree.Element
+    :param classified:   a list of dictionaries containing rules with metadata;
+                         might be recursive (dicts contain lists of dicts)
+    :type classified:    [dict(), dict(), ...]
+    :param input_xmlns:  XML namespaces occuring when reading the source file
+    :type input_xmlns:   list
+    :param output_xmlns: XML namespaces to be declared in a target file
+    :type output_xmlns:  list
+    :param bases:        Base elements (created for source @foreach elements)
+    :type bases:         list
+    :return:             the root element of a new DOM
+    :rtype:              lxml.etree.Element
     """
     def finish_a_tree(src_dom, target_dom, node, src_bases, dst_bases):
         if node['class'] == 'iteration':
-            srcbase, xmlmap = normalize_path(node['srcbase'], xmlns)
-            for src_base in xml.read_ambiguous_element(src_dom, srcbase, src_bases,
-                                                       bases=[], xmlmap=xmlmap):
-                dstbase, xmlmap2 = normalize_path(node['dstbase'], xmlns)
+            srcbase, xmlmap = normalize_path(node['srcbase'], input_xmlns)
+            for src_base in xml.read_ambiguous_element(src_dom, srcbase, src_bases, xmlmap):
+                dstbase, xmlmap2 = normalize_path(node['dstbase'], output_xmlns)
                 dst_base = xml.write_new_ambiguous_element(target_dom,
                     dstbase, dst_bases, xmlmap2)
                 for child in node['children']:
@@ -562,13 +569,13 @@ def run_rules(src_dom: lxml.etree.Element, target_dom: lxml.etree.Element,
         elif node['class'] == 'foreach-rule':
             args = []
             for src in node['src']:
-                source, xmlmap = normalize_path(src, xmlns)
+                source, xmlmap = normalize_path(src, input_xmlns)
                 args.append(xml.read_base_source(src_dom, source,
                     bases=src_bases, xmlmap=xmlmap))
             output = node['rule'](*args)
             if output is None:
                 return target_dom
-            dst, xmlmap = normalize_path(node['dst'][0], xmlns)
+            dst, xmlmap = normalize_path(node['dst'][0], output_xmlns)
             return xml.write_base_destination(target_dom, dst,
                 output, bases=dst_bases, xmlmap=xmlmap)
 
@@ -578,7 +585,7 @@ def run_rules(src_dom: lxml.etree.Element, target_dom: lxml.etree.Element,
 
             args = []
             for src in obj['src']:
-                source, xmlmap = normalize_path(src, xmlns)
+                source, xmlmap = normalize_path(src, input_xmlns)
                 args.append(xml.read_source(src_dom, source, xmlmap))
 
             logging.debug("Applying %s with arguments %s", obj['name'], str(args))
@@ -586,7 +593,7 @@ def run_rules(src_dom: lxml.etree.Element, target_dom: lxml.etree.Element,
             output = obj['rule'](*args)
             if output is None:
                 continue
-            dst, xmlmap = normalize_path(obj['dst'][0], xmlns)
+            dst, xmlmap = normalize_path(obj['dst'][0], output_xmlns)
             target_dom = xml.write_destination(target_dom, dst, output, xmlmap=xmlmap)
 
         elif obj['class'] in ('iteration', 'foreach-rule'):
@@ -595,15 +602,17 @@ def run_rules(src_dom: lxml.etree.Element, target_dom: lxml.etree.Element,
     return target_dom
 
 
-def apply_rules(dom: lxml.etree.Element, rules: dict, *, xmlns=None):
+def apply_rules(dom: lxml.etree.Element, rules: dict, *, input_xmlns=None, output_xmlns=None):
     """Apply given rules to the given DOM.
 
     :param dom:                 the root element of a DOM
     :type dom:                  lxml.etree.Element
     :param rules:               rule names associated to their implementation
     :type rules:                dict(str : function)
-    :param xmlns:               association of XML namespace name and URI to a path
-    :type xmlns:                dict
+    :param input_xmlns:         XML namespaces of source file to be considered
+    :type input_xmlns:          list
+    :param input_xmlns:         XML namespaces to target file be considered
+    :type input_xmlns:          list
     :return:                    root element of a new DOM
     :rtype:                     lxml.etree.Element
     :raises RuledXmlException:  some rule is invalid
@@ -611,7 +620,7 @@ def apply_rules(dom: lxml.etree.Element, rules: dict, *, xmlns=None):
     validate_rules(rules)
     classified = classify_rules(rules)
     ordered = reorder_rules(classified)
-    return run_rules(dom, None, ordered, xmlns)
+    return run_rules(dom, None, ordered, input_xmlns, output_xmlns)
 
 
 def run(in_fd, rules_filepath: str, out_fd, *, infile='', outfile='') -> int:
@@ -641,7 +650,9 @@ def run(in_fd, rules_filepath: str, out_fd, *, infile='', outfile='') -> int:
     required_exists(src_dom, meta['input_nonempty'], meta['input_required'], filepath=infile)
 
     # apply rules
-    target_dom = apply_rules(src_dom, rules, xmlns=meta['output_xml_namespaces'])
+    target_dom = apply_rules(src_dom, rules,
+        input_xmlns=meta['input_xml_namespaces'],
+        output_xmlns=meta['output_xml_namespaces'])
 
     # write target XML to file
     xml.write(target_dom, out_fd, encoding=meta['output_encoding'])
@@ -682,7 +693,8 @@ def batch_run(in_fd, rules_filepath: str, out_filepaths: list([str]),
 
         # apply rules
         target_dom = apply_rules(element, rules,
-            xmlns=meta['output_xml_namespaces'])
+            input_xmlns=meta['input_xml_namespaces'],
+            output_xmlns=meta['output_xml_namespaces'])
 
         # test: required elements exist?
         required_exists(target_dom, meta['output_nonempty'], meta['output_required'])
