@@ -89,7 +89,8 @@ def required_exists(dom: lxml.etree.Element, nonempty=None, required=None, *, fi
             raise exceptions.InvalidPathException(errmsg.format(req))
 
     for req in nonempty:
-        if xml.read_source(dom, req) == '':
+        requested, xmlmap = normalize_path(req, xmlns)  # TODO: xmlns undefined
+        if xml.read_source(dom, requested, xmlmap) == '':
             errmsg = 'Path {} is empty{}; must contain value'.format(req, suffix)
             raise exceptions.InvalidPathException(errmsg.format(req))
 
@@ -455,6 +456,79 @@ def reorder_rules(rules: dict):
     return rules
 
 
+
+def normalize_path(xmlpath: str, xmlns=[]) -> str:
+    """Normalize a given `xmlpath`. Hence replace namespaces with actual URIs
+    and normalize spaces/slashes.
+
+    :param xmlpath: an XPath-like expression
+    :type xmlpath:  str
+    :param xmlns:   XML namespace list as triples ``(path, name, uri)``
+    :type xmlns:    list
+    :return:        normalized path and XML map that applies
+    :rtype:         (str, dict)
+    """
+    def norm(p):
+        base, *attrs = p.split('@')
+        elements = list(filter(bool, base[0].strip('/').split('/')))
+
+        # prepare attribute
+        if attrs:
+            attr = attrs[0].split(':')
+            if not attr[0]:
+                attr[0] = None
+            assert len(attr) == 2, "Only one namespace allowed in attributes"
+            attr = tuple(attr)
+        else:
+            attr = None
+
+        # if empty path
+        if not elements:
+            return [], attr
+
+        # prepare children
+        rep = []
+        for elem in elements:
+            if ':' in elem and elem[0] != ':':
+                rep.append(elem.split(':'))
+            else:
+                rep.append((None, elem))
+
+        return rep, attr
+
+    assert 0 <= xmlpath.count('@') <= 1, "only one @ symbol allowed in paths"
+    base, base_attr = norm(xmlpath)
+    xmlmap = {}
+    for path, name, uri in base:
+        ref, attr = norm(path)
+        if ref[0:len(base)] == base:
+            xmlmap[name] = uri
+
+    normalized_path = ''
+    for ns, element in base:
+        normalized_path += '/'
+        if ns:
+            try:
+                normalized_path += '{' + xmlmap[ns] + '}'
+            except KeyError:
+                errmsg = "Unknown namespace {} in path {}".format(ns, xmlpath)
+                raise exceptions.InvalidPathException(errmsg)
+        normalized_path += element
+
+    if base_attr:
+        if base_attr[0] is not None:
+            try:
+                attr = '{' + xmlmap[base_attr[0]] + '}' + base_attr[1]
+            except KeyError:
+                errmsg = "Unknown attribute namespace {} in path {}".format(base_attr[0], xmlpath)
+                raise exceptions.InvalidPathException(errmsg)
+        else:
+            attr = base_attr[1]
+        normalized_path += '@' + attr
+
+    return normalized_path, xmlmap
+
+
 def run_rules(src_dom: lxml.etree.Element, target_dom: lxml.etree.Element,
     classified: list, xmlns=None):
     """Actually apply the classified rules to a target DOM.
@@ -475,9 +549,12 @@ def run_rules(src_dom: lxml.etree.Element, target_dom: lxml.etree.Element,
     """
     def finish_a_tree(src_dom, target_dom, node, src_bases, dst_bases):
         if node['class'] == 'iteration':
-            for src_base in xml.read_ambiguous_element(src_dom, node['srcbase'], src_bases):
+            srcbase, xmlmap = normalize_path(node['srcbase'], xmlns)
+            for src_base in xml.read_ambiguous_element(src_dom, srcbase, src_bases,
+                                                       bases=[], xmlmap=xmlmap):
+                dstbase, xmlmap2 = normalize_path(node['dstbase'], xmlns)
                 dst_base = xml.write_new_ambiguous_element(target_dom,
-                    node['dstbase'], dst_bases, xmlns)
+                    dstbase, dst_bases, xmlmap2)
                 for child in node['children']:
                     target_dom = finish_a_tree(src_dom, target_dom, child,
                         src_bases.copy() + [src_base], dst_bases.copy() + [dst_base])
@@ -485,12 +562,15 @@ def run_rules(src_dom: lxml.etree.Element, target_dom: lxml.etree.Element,
         elif node['class'] == 'foreach-rule':
             args = []
             for src in node['src']:
-                args.append(xml.read_base_source(src_dom, src, bases=src_bases))
+                source, xmlmap = normalize_path(src, xmlns)
+                args.append(xml.read_base_source(src_dom, source,
+                    bases=src_bases, xmlmap=xmlmap))
             output = node['rule'](*args)
             if output is None:
                 return target_dom
-            return xml.write_base_destination(target_dom, node['dst'][0],
-                output, bases=dst_bases, xmlns=xmlns)
+            dst, xmlmap = normalize_path(node['dst'][0], xmlns)
+            return xml.write_base_destination(target_dom, dst,
+                output, bases=dst_bases, xmlmap=xmlmap)
 
     for obj in classified:
         if obj['class'] == 'basicrule':
@@ -498,15 +578,16 @@ def run_rules(src_dom: lxml.etree.Element, target_dom: lxml.etree.Element,
 
             args = []
             for src in obj['src']:
-                args.append(xml.read_source(src_dom, src))
+                source, xmlmap = normalize_path(src, xmlns)
+                args.append(xml.read_source(src_dom, source, xmlmap))
 
             logging.debug("Applying %s with arguments %s", obj['name'], str(args))
 
             output = obj['rule'](*args)
             if output is None:
                 continue
-            dst = obj['dst'][0]
-            target_dom = xml.write_destination(target_dom, dst, output, xmlns=xmlns)
+            dst, xmlmap = normalize_path(obj['dst'][0], xmlns)
+            target_dom = xml.write_destination(target_dom, dst, output, xmlmap=xmlmap)
 
         elif obj['class'] in ('iteration', 'foreach-rule'):
             target_dom = finish_a_tree(src_dom, target_dom, obj, [], [])
