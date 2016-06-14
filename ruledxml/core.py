@@ -525,7 +525,7 @@ def normalize_path(xmlpath: str, xmlns=[]) -> str:
                 raise exceptions.InvalidPathException(errmsg)
         else:
             attr = base_attr[1]
-        normalized_path += '@' + attr
+        normalized_path += '/@' + attr
 
     return normalized_path, xmlmap
 

@@ -7,7 +7,7 @@ output_xml_namespaces = [
 ]
 
 
-@destination("/html@xml:lang")
+@destination("/html/@xml:lang")
 def ruleLanguage():
     return "de"
 

@@ -2,14 +2,14 @@ from ruledxml import destination, source, foreach
 
 
 @foreach("/html/body/article", "/doc/section")
-@source("/html/head/meta@charset")
-@destination("/doc/section@charset")
+@source("/html/head/meta/@charset")
+@destination("/doc/section/@charset")
 def ruleMultipleNestedBasesCharset(charset):
     return charset
 
 @foreach("/html/body/article", "/doc/section")
 @source("/html/body/article/lang")
-@destination("/doc/section@language")
+@destination("/doc/section/@language")
 def ruleMultipleNestedBasesLanguage(lang):
     return lang
 
@@ -21,7 +21,7 @@ def ruleMultipleNestedBasesParagraph(h1, p):
     return h1 + ": " + p
 
 @foreach("/html/body/article", "/doc/section")
-@destination("/doc/section/text/paragraph@style")
+@destination("/doc/section/text/paragraph/@style")
 def ruleMultipleNestedBasesParagraphStyle():
     return "text-indent:5px"
 
