@@ -24,7 +24,7 @@ def readfile(fname):
 
 setup(
     name='ruledxml',
-    version='1.5.2',
+    version='1.6.0',
     url='http://lukas-prokop.at/proj/ruledxml/',
     license='BSD',
     author='Lukas Prokop',
@@ -42,7 +42,7 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Natural Language :: English',
         'Operating System :: OS Independent',
-        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
         'Topic :: Office/Business',
         'Topic :: Text Processing :: Markup :: XML'
     ],
