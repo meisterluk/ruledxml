@@ -68,8 +68,8 @@ def make_xpath(element, query, nsmap):
     :type nsmap:        dict
     :return:            the xpath call return value
     """
+    wo_default = dict((k, v) for k,v in nsmap.items() if k is not None)
     if '{' not in query:
-        wo_default = dict((k, v) for k,v in nsmap.items() if k is not None)
         return element.xpath(query, namespaces=wo_default)
 
     for name, uri in nsmap.items():
@@ -78,7 +78,7 @@ def make_xpath(element, query, nsmap):
         else:
             query = query.replace('{' + uri + '}', name + ':')
 
-    return element.xpath(query, namespaces=nsmap)
+    return element.xpath(query, namespaces=wo_default)
 
 
 def split_xmlpath(xmlpath: str) -> list:
@@ -86,6 +86,8 @@ def split_xmlpath(xmlpath: str) -> list:
 
     >>> split_xmlpath('/a/b')
     ['a', 'b']
+    >>> split_xmlpath('/a/@b')
+    ['a']
     >>> split_xmlpath('/{http://example.org}a/b')
     ['{http://example.org}a', 'b']
 
@@ -106,7 +108,8 @@ def split_xmlpath(xmlpath: str) -> list:
 
     a = [0] + indices[:]
     b = indices[:] + [len(xmlpath)]
-    return [xmlpath[src + 1:dst] for src, dst in zip(a, b) if src < dst]
+    return [xmlpath[src + 1:dst] for src, dst in zip(a, b)
+            if src < dst and xmlpath[src + 1:dst]]
 
 
 def strip_last_element(path):
